@@ -376,6 +376,137 @@ st.markdown(
     [data-testid="stSidebar"] [data-testid="stAlert"] span {
         color: #166534;
     }
+
+    /* FINAL CONTRAST FIX: buttons, inputs, dropdowns and uploader */
+    .stApp button,
+    .stApp button *,
+    .stApp [role="button"],
+    .stApp [role="button"] * {
+        color: #38205e !important;
+    }
+
+    .stApp .stButton > button,
+    .stApp .stDownloadButton > button,
+    .stApp [data-testid="stFormSubmitButton"] button {
+        background: #eee8f7 !important;
+        color: #38205e !important;
+        -webkit-text-fill-color: #38205e !important;
+        border: 1px solid #d8c9ed !important;
+        border-radius: 10px !important;
+        font-weight: 600 !important;
+        min-height: 44px;
+        opacity: 1 !important;
+    }
+
+    .stApp .stButton > button *,
+    .stApp .stDownloadButton > button *,
+    .stApp [data-testid="stFormSubmitButton"] button * {
+        color: #38205e !important;
+        -webkit-text-fill-color: #38205e !important;
+        fill: #38205e !important;
+    }
+
+    .stApp .stButton > button:hover,
+    .stApp .stDownloadButton > button:hover,
+    .stApp [data-testid="stFormSubmitButton"] button:hover {
+        background: #dfd1f2 !important;
+        color: #281044 !important;
+        border-color: #7040bd !important;
+    }
+
+    .stApp .stButton > button[kind="primary"],
+    .stApp .stDownloadButton > button[kind="primary"],
+    .stApp [data-testid="stFormSubmitButton"] button[kind="primary"] {
+        background: #6031a7 !important;
+        color: #ffffff !important;
+        -webkit-text-fill-color: #ffffff !important;
+        border-color: #6031a7 !important;
+    }
+
+    .stApp .stButton > button[kind="primary"] *,
+    .stApp .stDownloadButton > button[kind="primary"] *,
+    .stApp [data-testid="stFormSubmitButton"] button[kind="primary"] * {
+        color: #ffffff !important;
+        -webkit-text-fill-color: #ffffff !important;
+        fill: #ffffff !important;
+    }
+
+    .stApp .stButton > button[kind="primary"]:hover,
+    .stApp .stDownloadButton > button[kind="primary"]:hover,
+    .stApp [data-testid="stFormSubmitButton"] button[kind="primary"]:hover {
+        background: #48217f !important;
+        color: #ffffff !important;
+        border-color: #48217f !important;
+    }
+
+    .stApp .stButton > button:disabled,
+    .stApp .stDownloadButton > button:disabled,
+    .stApp [data-testid="stFormSubmitButton"] button:disabled {
+        background: #e8e5ed !important;
+        color: #655b72 !important;
+        -webkit-text-fill-color: #655b72 !important;
+        opacity: 1 !important;
+    }
+
+    /* Text, number, date, time and multiline fields */
+    .stApp input,
+    .stApp textarea,
+    .stApp select,
+    .stApp [data-baseweb="input"] input,
+    .stApp [data-baseweb="textarea"] textarea,
+    .stApp [data-testid="stNumberInput"] input,
+    .stApp [data-testid="stTextInput"] input,
+    .stApp [data-testid="stDateInput"] input,
+    .stApp [data-testid="stTimeInput"] input {
+        background-color: #ffffff !important;
+        color: #211a30 !important;
+        -webkit-text-fill-color: #211a30 !important;
+        caret-color: #6031a7 !important;
+        border-color: #cfc3df !important;
+        opacity: 1 !important;
+    }
+
+    .stApp input::placeholder,
+    .stApp textarea::placeholder {
+        color: #6b6078 !important;
+        -webkit-text-fill-color: #6b6078 !important;
+        opacity: 1 !important;
+    }
+
+    /* Dropdowns, selected values, menu options and multiselect chips */
+    .stApp [data-baseweb="select"],
+    .stApp [data-baseweb="select"] *,
+    .stApp [role="listbox"],
+    .stApp [role="listbox"] *,
+    .stApp [role="option"],
+    .stApp [role="option"] * {
+        color: #211a30 !important;
+        -webkit-text-fill-color: #211a30 !important;
+    }
+
+    .stApp [data-baseweb="select"] > div {
+        background-color: #ffffff !important;
+        border-color: #cfc3df !important;
+    }
+
+    /* File upload control */
+    .stApp [data-testid="stFileUploader"],
+    .stApp [data-testid="stFileUploader"] *,
+    .stApp [data-testid="stFileUploaderDropzone"] {
+        color: #302344 !important;
+        -webkit-text-fill-color: #302344 !important;
+    }
+
+    /* Widget labels, checkbox/radio labels and help text */
+    .stApp [data-testid="stWidgetLabel"],
+    .stApp [data-testid="stWidgetLabel"] *,
+    .stApp [data-testid="stHelp"],
+    .stApp [data-testid="stHelp"] *,
+    .stApp [role="radiogroup"] label,
+    .stApp [role="checkbox"] label {
+        color: #302344 !important;
+    }
+
     </style>
     """,
     unsafe_allow_html=True,
