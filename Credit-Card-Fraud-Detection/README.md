@@ -20,4 +20,4 @@ A machine learning project to identify potentially fraudulent credit card transa
 - Random Forest
 - XGBoost
 
-More details and results will be added as the project is finalized.
+For More details refer Documentation.md file.
