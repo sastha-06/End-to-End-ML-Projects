@@ -7,8 +7,8 @@ A machine learning project to identify potentially fraudulent credit card transa
 - [x] Data cleaning and preprocessing
 - [x] Model training and evaluation
 - [x] Model comparison
-- [ ] Streamlit web application
-- [ ] Deployment
+- [x] Streamlit web application
+- [x] Deployment
 
 ## Dataset
 
