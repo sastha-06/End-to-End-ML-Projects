@@ -8,11 +8,11 @@ import streamlit as st
 
 
 # ============================================================
-# 1. PAGE CONFIGURATION
+# 1. CONFIGURATION
 # ============================================================
 
 st.set_page_config(
-    page_title="FraudGuard | Credit Card Security",
+    page_title="FraudGuard | Credit Card Fraud Detection",
     page_icon="🛡️",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -23,23 +23,41 @@ MODEL_PATH = BASE_DIR / "saved_models" / "tuned_xgboost.joblib"
 
 FEATURES = ["Time"] + [f"V{i}" for i in range(1, 29)] + ["Amount"]
 
-# Approximate training-set Amount capping limits.
-# Replace these with the exact values from your training notebook if needed.
+PAGES = [
+    "Home",
+    "Analyze Transaction",
+    "Batch Analysis",
+    "Model Performance",
+    "About Project",
+]
+
+# Replace these approximate values with the exact training values
+# from your notebook if they differ.
 AMOUNT_LOWER = -102.55
 AMOUNT_UPPER = 186.09
 
+# Recorded evaluation results for the tuned XGBoost model.
+MODEL_METRICS = {
+    "Test Average Precision": 0.8139,
+    "Precision": 0.8621,
+    "Recall": 0.7895,
+    "F1-score": 0.8242,
+}
+
 
 # ============================================================
-# 2. CUSTOM DESIGN
+# 2. DESIGN AND STYLING
 # ============================================================
 
 st.markdown(
     """
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+    @import url(
+        'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap'
+    );
 
     html, body, [class*="css"] {
-        font-family: 'Inter', sans-serif;
+        font-family: Inter, sans-serif;
     }
 
     .stApp {
@@ -47,74 +65,79 @@ st.markdown(
         color: #211a30;
     }
 
-    [data-testid="stSidebar"] {
-        background: #ffffff;
-        border-right: 1px solid #e9e5f2;
+    [data-testid="stHeader"] {
+        background: rgba(247, 247, 251, 0.92);
     }
 
-    [data-testid="stSidebar"] h1 {
-        color: #54249b;
-        font-weight: 800;
+    [data-testid="stSidebar"] {
+        background: #ffffff;
+        border-right: 1px solid #e8e1f0;
+    }
+
+    [data-testid="stSidebar"] p,
+    [data-testid="stSidebar"] label,
+    [data-testid="stSidebar"] span {
+        color: #302344;
     }
 
     .hero {
-        padding: 34px;
-        border-radius: 22px;
-        background: linear-gradient(125deg, #281044 0%, #52239a 55%, #8050d5 100%);
+        padding: 32px;
+        border-radius: 20px;
+        background: linear-gradient(
+            125deg, #281044 0%, #52239a 58%, #8050d5 100%
+        );
         color: #ffffff;
-        margin-bottom: 24px;
-        box-shadow: 0 12px 32px rgba(70, 35, 120, 0.13);
+        margin-bottom: 26px;
+        box-shadow: 0 12px 30px rgba(70, 35, 120, 0.12);
     }
 
     .hero h1 {
-        font-size: 2.35rem;
+        color: #ffffff !important;
+        font-size: clamp(1.9rem, 4vw, 2.65rem);
         line-height: 1.2;
         font-weight: 800;
-        color: #ffffff;
-        margin-bottom: 12px;
+        margin: 8px 0 12px 0;
     }
 
     .hero p {
-        color: #eee4ff;
-        font-size: 1rem;
-        line-height: 1.7;
-        margin-bottom: 0;
+        color: #eee4ff !important;
+        line-height: 1.75;
+        margin: 0;
     }
 
     .eyebrow {
         color: #e0caff;
-        font-size: 0.78rem;
+        font-size: 0.76rem;
         font-weight: 700;
-        text-transform: uppercase;
         letter-spacing: 2px;
-        margin-bottom: 12px;
+        text-transform: uppercase;
     }
 
     .section-intro {
-        color: #706780;
-        line-height: 1.65;
+        color: #5f536f;
+        line-height: 1.7;
         margin-bottom: 20px;
     }
 
     .info-card {
         background: #ffffff;
-        border: 1px solid #ebe6f3;
+        border: 1px solid #e8e1f0;
         border-radius: 16px;
         padding: 22px;
-        min-height: 135px;
+        min-height: 150px;
         margin-bottom: 12px;
     }
 
     .info-card h3 {
-        color: #452078;
-        font-size: 1rem;
+        color: #452078 !important;
+        font-size: 1.05rem;
         margin-bottom: 10px;
     }
 
     .info-card p {
-        color: #716982;
-        font-size: 0.9rem;
-        line-height: 1.6;
+        color: #5f536f !important;
+        font-size: 0.91rem;
+        line-height: 1.7;
         margin-bottom: 0;
     }
 
@@ -122,391 +145,133 @@ st.markdown(
         background: #f0eaff;
         border-left: 4px solid #7646bd;
         color: #382052;
-        border-radius: 8px;
+        border-radius: 9px;
         padding: 15px 18px;
-        line-height: 1.6;
-        margin: 14px 0 20px 0;
+        line-height: 1.7;
+        margin: 16px 0 22px 0;
     }
 
     .small-muted {
-        color: #746b83;
-        font-size: 0.85rem;
-        line-height: 1.6;
+        color: #5f536f;
+        font-size: 0.84rem;
+        line-height: 1.7;
     }
 
     div[data-testid="stMetric"] {
         background: #ffffff;
-        border: 1px solid #ebe6f3;
+        border: 1px solid #e8e1f0;
         border-radius: 15px;
         padding: 18px;
     }
 
-    div[data-testid="stMetricLabel"] {
-        color: #716780;
+    div[data-testid="stMetricLabel"],
+    div[data-testid="stMetricLabel"] *,
+    div[data-testid="stMetricValue"],
+    div[data-testid="stMetricValue"] * {
+        color: #38205e !important;
     }
 
-    div[data-testid="stMetricValue"] {
-        color: #38205e;
-        font-weight: 750;
+    div[data-testid="stForm"] {
+        background: #ffffff;
+        border: 1px solid #e8e1f0;
+        border-radius: 16px;
+        padding: 22px;
     }
 
-    /* All buttons: readable text and consistent styling */
+    .stApp h1, .stApp h2, .stApp h3, .stApp h4 {
+        color: #302344;
+        letter-spacing: -0.4px;
+    }
+
+    .stApp p,
+    .stApp li,
+    .stApp label,
+    .stApp [data-testid="stWidgetLabel"] {
+        color: #302344;
+    }
+
+    .stApp input,
+    .stApp textarea {
+        color: #211a30 !important;
+        background-color: #ffffff !important;
+    }
+
+    .stApp a {
+        color: #54249b;
+    }
+
+    /* Consistent button appearance */
     .stButton > button,
     .stDownloadButton > button,
     [data-testid="stFormSubmitButton"] button {
-        background-color: #eee8f7 !important;
+        background: #eee8f7 !important;
         color: #38205e !important;
         border: 1px solid #d8c9ed !important;
-        border-radius: 10px;
-        font-weight: 600;
+        border-radius: 10px !important;
         min-height: 44px;
+        font-weight: 600 !important;
     }
 
-    /* Ensure nested button text and icons inherit the visible color */
     .stButton > button *,
     .stDownloadButton > button *,
     [data-testid="stFormSubmitButton"] button * {
-        color: inherit !important;
+        color: #38205e !important;
+        fill: #38205e !important;
     }
 
     .stButton > button:hover,
     .stDownloadButton > button:hover,
     [data-testid="stFormSubmitButton"] button:hover {
-        background-color: #dfd1f2 !important;
-        color: #281044 !important;
+        background: #dfd1f2 !important;
         border-color: #7040bd !important;
     }
 
-    /* Primary action buttons use purple with white text */
     .stButton > button[kind="primary"],
     .stDownloadButton > button[kind="primary"],
     [data-testid="stFormSubmitButton"] button[kind="primary"] {
-        background-color: #6031a7 !important;
+        background: #6031a7 !important;
         color: #ffffff !important;
-        border: 1px solid #6031a7 !important;
+        border-color: #6031a7 !important;
     }
 
     .stButton > button[kind="primary"] *,
     .stDownloadButton > button[kind="primary"] *,
     [data-testid="stFormSubmitButton"] button[kind="primary"] * {
         color: #ffffff !important;
+        fill: #ffffff !important;
     }
 
     .stButton > button[kind="primary"]:hover,
     .stDownloadButton > button[kind="primary"]:hover,
     [data-testid="stFormSubmitButton"] button[kind="primary"]:hover {
-        background-color: #48217f !important;
-        color: #ffffff !important;
+        background: #48217f !important;
         border-color: #48217f !important;
     }
 
-    /* Disabled buttons remain readable */
-    .stButton > button:disabled,
-    .stDownloadButton > button:disabled,
-    [data-testid="stFormSubmitButton"] button:disabled {
-        background-color: #e8e5ed !important;
-        color: #655b72 !important;
-        border-color: #d7d1df !important;
-        opacity: 1 !important;
+    [data-testid="stFileUploader"],
+    [data-testid="stFileUploader"] * {
+        color: #302344;
     }
 
-    div[data-testid="stForm"] {
-        background: #ffffff;
-        border: 1px solid #ebe6f3;
-        border-radius: 16px;
-        padding: 20px;
-    }
-
-    h1, h2, h3 {
-        letter-spacing: -0.5px;
+    [data-testid="stExpander"] {
+        border-color: #e8e1f0;
+        border-radius: 10px;
     }
 
     hr {
-        border-color: #e9e4f0;
+        border-color: #e8e1f0;
     }
 
-    /* --------------------------------------------------------
-       ACCESSIBILITY: keep text readable across the whole app
-       -------------------------------------------------------- */
+    @media (max-width: 640px) {
+        .hero {
+            padding: 23px;
+            border-radius: 15px;
+        }
 
-    :root {
-        --text-color: #211a30;
-        --secondary-text-color: #554b65;
+        .info-card {
+            padding: 17px;
+        }
     }
-
-    .stApp,
-    [data-testid="stAppViewContainer"] {
-        color: #211a30;
-    }
-
-    /* Main page headings and normal Streamlit text */
-    .stApp h1:not(.hero h1),
-    .stApp h2,
-    .stApp h3,
-    .stApp h4,
-    .stApp p,
-    .stApp li,
-    .stApp label,
-    .stApp legend,
-    .stApp [data-testid="stMarkdownContainer"],
-    .stApp [data-testid="stCaptionContainer"],
-    .stApp [data-testid="stText"],
-    .stApp [data-testid="stWidgetLabel"] {
-        color: #302344;
-    }
-
-    .stApp [data-testid="stCaptionContainer"],
-    .stApp .stCaption,
-    .stApp small {
-        color: #5f536f;
-    }
-
-    /* Keep the hero banner's light text readable on its dark background */
-    .stApp .hero,
-    .stApp .hero h1,
-    .stApp .hero p,
-    .stApp .hero .eyebrow {
-        color: #ffffff;
-    }
-
-    .stApp .hero p {
-        color: #eee4ff;
-    }
-
-    .stApp .hero .eyebrow {
-        color: #e0caff;
-    }
-
-    /* Sidebar: navigation, headings, descriptions and labels */
-    [data-testid="stSidebar"],
-    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"],
-    [data-testid="stSidebar"] [data-testid="stWidgetLabel"],
-    [data-testid="stSidebar"] label,
-    [data-testid="stSidebar"] p,
-    [data-testid="stSidebar"] span,
-    [data-testid="stSidebar"] h1,
-    [data-testid="stSidebar"] h2,
-    [data-testid="stSidebar"] h3,
-    [data-testid="stSidebar"] [data-testid="stCaptionContainer"] {
-        color: #302344;
-    }
-
-    [data-testid="stSidebar"] .small-muted {
-        color: #5f536f;
-    }
-
-    /* Inputs, dropdowns, radio buttons and checkboxes */
-    .stApp input,
-    .stApp textarea,
-    .stApp select,
-    .stApp [data-baseweb="select"] *,
-    .stApp [data-baseweb="input"] *,
-    .stApp [data-baseweb="textarea"] *,
-    .stApp [data-testid="stNumberInput"] input {
-        color: #211a30;
-    }
-
-    .stApp input::placeholder,
-    .stApp textarea::placeholder {
-        color: #6b6078;
-        opacity: 1;
-    }
-
-    /* Metric labels and values */
-    [data-testid="stMetricLabel"],
-    [data-testid="stMetricLabel"] *,
-    [data-testid="stMetricValue"],
-    [data-testid="stMetricValue"] *,
-    [data-testid="stMetricDelta"] {
-        color: #38205e;
-    }
-
-    /* Tables, dataframes, tabs, expanders and help text */
-    .stApp [data-testid="stDataFrame"],
-    .stApp [data-testid="stTable"],
-    .stApp [data-testid="stExpander"],
-    .stApp [data-testid="stTab"],
-    .stApp [data-testid="stTooltipContent"] {
-        color: #302344;
-    }
-
-    .stApp [role="radiogroup"] label,
-    .stApp [role="checkbox"] label {
-        color: #302344;
-    }
-
-    /* Make links clearly visible against light backgrounds */
-    .stApp a {
-        color: #54249b;
-    }
-
-    .stApp a:hover {
-        color: #351365;
-    }
-
-    /* Preserve readable button text */
-    .stButton > button,
-    .stDownloadButton > button,
-    [data-testid="stFormSubmitButton"] button {
-        color: #302344;
-    }
-
-    .stButton > button[kind="primary"],
-    .stDownloadButton > button[kind="primary"],
-    [data-testid="stFormSubmitButton"] button[kind="primary"] {
-        color: #ffffff;
-    }
-
-    /* Keep alert text readable on its colored background */
-    [data-testid="stAlert"] {
-        color: #211a30;
-    }
-
-    [data-testid="stAlert"] p,
-    [data-testid="stAlert"] span {
-        color: inherit;
-    }
-
-    /* Streamlit sidebar success panel has its own green styling */
-    [data-testid="stSidebar"] [data-testid="stAlert"] {
-        color: #166534;
-    }
-
-    [data-testid="stSidebar"] [data-testid="stAlert"] p,
-    [data-testid="stSidebar"] [data-testid="stAlert"] span {
-        color: #166534;
-    }
-
-    /* FINAL CONTRAST FIX: buttons, inputs, dropdowns and uploader */
-    .stApp button,
-    .stApp button *,
-    .stApp [role="button"],
-    .stApp [role="button"] * {
-        color: #38205e !important;
-    }
-
-    .stApp .stButton > button,
-    .stApp .stDownloadButton > button,
-    .stApp [data-testid="stFormSubmitButton"] button {
-        background: #eee8f7 !important;
-        color: #38205e !important;
-        -webkit-text-fill-color: #38205e !important;
-        border: 1px solid #d8c9ed !important;
-        border-radius: 10px !important;
-        font-weight: 600 !important;
-        min-height: 44px;
-        opacity: 1 !important;
-    }
-
-    .stApp .stButton > button *,
-    .stApp .stDownloadButton > button *,
-    .stApp [data-testid="stFormSubmitButton"] button * {
-        color: #38205e !important;
-        -webkit-text-fill-color: #38205e !important;
-        fill: #38205e !important;
-    }
-
-    .stApp .stButton > button:hover,
-    .stApp .stDownloadButton > button:hover,
-    .stApp [data-testid="stFormSubmitButton"] button:hover {
-        background: #dfd1f2 !important;
-        color: #281044 !important;
-        border-color: #7040bd !important;
-    }
-
-    .stApp .stButton > button[kind="primary"],
-    .stApp .stDownloadButton > button[kind="primary"],
-    .stApp [data-testid="stFormSubmitButton"] button[kind="primary"] {
-        background: #6031a7 !important;
-        color: #ffffff !important;
-        -webkit-text-fill-color: #ffffff !important;
-        border-color: #6031a7 !important;
-    }
-
-    .stApp .stButton > button[kind="primary"] *,
-    .stApp .stDownloadButton > button[kind="primary"] *,
-    .stApp [data-testid="stFormSubmitButton"] button[kind="primary"] * {
-        color: #ffffff !important;
-        -webkit-text-fill-color: #ffffff !important;
-        fill: #ffffff !important;
-    }
-
-    .stApp .stButton > button[kind="primary"]:hover,
-    .stApp .stDownloadButton > button[kind="primary"]:hover,
-    .stApp [data-testid="stFormSubmitButton"] button[kind="primary"]:hover {
-        background: #48217f !important;
-        color: #ffffff !important;
-        border-color: #48217f !important;
-    }
-
-    .stApp .stButton > button:disabled,
-    .stApp .stDownloadButton > button:disabled,
-    .stApp [data-testid="stFormSubmitButton"] button:disabled {
-        background: #e8e5ed !important;
-        color: #655b72 !important;
-        -webkit-text-fill-color: #655b72 !important;
-        opacity: 1 !important;
-    }
-
-    /* Text, number, date, time and multiline fields */
-    .stApp input,
-    .stApp textarea,
-    .stApp select,
-    .stApp [data-baseweb="input"] input,
-    .stApp [data-baseweb="textarea"] textarea,
-    .stApp [data-testid="stNumberInput"] input,
-    .stApp [data-testid="stTextInput"] input,
-    .stApp [data-testid="stDateInput"] input,
-    .stApp [data-testid="stTimeInput"] input {
-        background-color: #ffffff !important;
-        color: #211a30 !important;
-        -webkit-text-fill-color: #211a30 !important;
-        caret-color: #6031a7 !important;
-        border-color: #cfc3df !important;
-        opacity: 1 !important;
-    }
-
-    .stApp input::placeholder,
-    .stApp textarea::placeholder {
-        color: #6b6078 !important;
-        -webkit-text-fill-color: #6b6078 !important;
-        opacity: 1 !important;
-    }
-
-    /* Dropdowns, selected values, menu options and multiselect chips */
-    .stApp [data-baseweb="select"],
-    .stApp [data-baseweb="select"] *,
-    .stApp [role="listbox"],
-    .stApp [role="listbox"] *,
-    .stApp [role="option"],
-    .stApp [role="option"] * {
-        color: #211a30 !important;
-        -webkit-text-fill-color: #211a30 !important;
-    }
-
-    .stApp [data-baseweb="select"] > div {
-        background-color: #ffffff !important;
-        border-color: #cfc3df !important;
-    }
-
-    /* File upload control */
-    .stApp [data-testid="stFileUploader"],
-    .stApp [data-testid="stFileUploader"] *,
-    .stApp [data-testid="stFileUploaderDropzone"] {
-        color: #302344 !important;
-        -webkit-text-fill-color: #302344 !important;
-    }
-
-    /* Widget labels, checkbox/radio labels and help text */
-    .stApp [data-testid="stWidgetLabel"],
-    .stApp [data-testid="stWidgetLabel"] *,
-    .stApp [data-testid="stHelp"],
-    .stApp [data-testid="stHelp"] *,
-    .stApp [role="radiogroup"] label,
-    .stApp [role="checkbox"] label {
-        color: #302344 !important;
-    }
-
     </style>
     """,
     unsafe_allow_html=True,
@@ -514,7 +279,7 @@ st.markdown(
 
 
 # ============================================================
-# 3. LOAD THE SAVED XGBOOST MODEL
+# 3. LOAD MODEL
 # ============================================================
 
 @st.cache_resource
@@ -524,22 +289,19 @@ def load_model():
 
 if not MODEL_PATH.exists():
     st.error(
-        "The trained XGBoost model was not found. Check that "
-        "`saved_models/tuned_xgboost.joblib` exists in your repository."
+        "The XGBoost model file was not found. Confirm that "
+        "saved_models/tuned_xgboost.joblib exists in your repository."
     )
     st.stop()
 
 try:
     model = load_model()
 except Exception as exc:
-    st.error(
-        "The saved model could not be loaded. This may be caused by "
-        "incompatible library versions or an invalid model file."
-    )
+    st.error("The trained model could not be loaded.")
     st.code(str(exc))
     st.info(
-        "Check the scikit-learn and XGBoost versions used when the model "
-        "was saved, and use compatible versions in requirements.txt."
+        "Check that your requirements.txt uses library versions "
+        "compatible with the versions used to save the model."
     )
     st.stop()
 
@@ -547,87 +309,6 @@ except Exception as exc:
 # ============================================================
 # 4. HELPER FUNCTIONS
 # ============================================================
-
-def prepare_input(data):
-    """Validate model features and apply the training Amount cap."""
-
-    if not isinstance(data, pd.DataFrame):
-        raise ValueError("Input must be a pandas DataFrame.")
-
-    missing = [column for column in FEATURES if column not in data.columns]
-
-    if missing:
-        raise ValueError(
-            "Missing required feature columns: " + ", ".join(missing)
-        )
-
-    prepared = data[FEATURES].copy()
-
-    for column in FEATURES:
-        prepared[column] = pd.to_numeric(
-            prepared[column],
-            errors="raise",
-        )
-
-    values = prepared.to_numpy(dtype=float)
-
-    if not np.isfinite(values).all():
-        raise ValueError(
-            "Input contains missing, infinite, or invalid numerical values."
-        )
-
-    if (prepared["Time"] < 0).any():
-        raise ValueError("Time must be zero or greater.")
-
-    if (prepared["Amount"] < 0).any():
-        raise ValueError("Transaction Amount must be zero or greater.")
-
-    # Match the approximate Amount capping used during training.
-    prepared["Amount"] = prepared["Amount"].clip(
-        lower=AMOUNT_LOWER,
-        upper=AMOUNT_UPPER,
-    )
-
-    return prepared
-
-
-def predict_transactions(data):
-    """Return binary predictions and estimated fraud scores."""
-
-    predictions = model.predict(data).astype(int)
-
-    if hasattr(model, "predict_proba"):
-        probabilities = model.predict_proba(data)
-        classes = list(model.classes_)
-
-        if 1 not in classes:
-            raise ValueError("The saved model does not contain fraud class 1.")
-
-        fraud_index = classes.index(1)
-        scores = probabilities[:, fraud_index]
-    else:
-        scores = np.full(len(data), np.nan)
-
-    return predictions, scores
-
-
-def analyze_transactions(data):
-    """Create a result table for valid model input."""
-
-    prepared = prepare_input(data)
-    predictions, scores = predict_transactions(prepared)
-
-    results = prepared.copy()
-    results.insert(0, "Transaction_ID", range(1, len(results) + 1))
-    results["Prediction"] = np.where(
-        predictions == 1,
-        "Potential Fraud",
-        "Normal",
-    )
-    results["Estimated_Fraud_Score (%)"] = np.round(scores * 100, 2)
-
-    return results
-
 
 def show_hero(eyebrow, title, description):
     st.markdown(
@@ -642,19 +323,100 @@ def show_hero(eyebrow, title, description):
     )
 
 
+def prepare_input(data):
+    """Validate the input and apply the Amount cap used in training."""
+
+    if not isinstance(data, pd.DataFrame):
+        raise ValueError("Input must be a pandas DataFrame.")
+
+    missing = [col for col in FEATURES if col not in data.columns]
+
+    if missing:
+        raise ValueError(
+            "Missing required features: " + ", ".join(missing)
+        )
+
+    prepared = data[FEATURES].copy()
+
+    for col in FEATURES:
+        prepared[col] = pd.to_numeric(prepared[col], errors="raise")
+
+    values = prepared.to_numpy(dtype=float)
+
+    if not np.isfinite(values).all():
+        raise ValueError(
+            "Input contains missing, infinite, or invalid numerical values."
+        )
+
+    if (prepared["Time"] < 0).any():
+        raise ValueError("Time must be zero or greater.")
+
+    if (prepared["Amount"] < 0).any():
+        raise ValueError("Transaction Amount must be zero or greater.")
+
+    prepared["Amount"] = prepared["Amount"].clip(
+        lower=AMOUNT_LOWER,
+        upper=AMOUNT_UPPER,
+    )
+
+    return prepared
+
+
+def predict_transactions(data):
+    """Generate the model prediction and fraud probability."""
+
+    predictions = model.predict(data).astype(int)
+
+    if not hasattr(model, "predict_proba"):
+        raise ValueError(
+            "This saved model does not provide probability predictions."
+        )
+
+    probabilities = model.predict_proba(data)
+    classes = list(model.classes_)
+
+    if 1 not in classes:
+        raise ValueError("The saved model does not contain fraud class 1.")
+
+    fraud_index = classes.index(1)
+    scores = probabilities[:, fraud_index]
+
+    return predictions, scores
+
+
+def analyze_transactions(data):
+    """Validate transactions and create a prediction report."""
+
+    prepared = prepare_input(data)
+    predictions, scores = predict_transactions(prepared)
+
+    results = prepared.copy()
+    results.insert(
+        0,
+        "Transaction_ID",
+        range(1, len(results) + 1),
+    )
+    results["Prediction"] = np.where(
+        predictions == 1,
+        "Potential Fraud",
+        "Normal",
+    )
+    results["Estimated_Fraud_Score (%)"] = np.round(scores * 100, 2)
+
+    return results
+
+
 def show_result(prediction, score):
     st.divider()
     st.subheader("Analysis Result")
 
     if prediction == 1:
         st.error(
-            "⚠️ Potential fraud detected by the model. "
-            "This transaction may require further review."
+            "⚠️ Potential fraud detected. This transaction may need "
+            "further investigation."
         )
     else:
-        st.success(
-            "✓ The model classified this transaction as normal."
-        )
+        st.success("✓ The model classified this transaction as normal.")
 
     col1, col2 = st.columns(2)
 
@@ -665,20 +427,23 @@ def show_result(prediction, score):
         )
 
     with col2:
-        if np.isfinite(score):
-            st.metric("Estimated Fraud Score", f"{score * 100:.2f}%")
-        else:
-            st.metric("Estimated Fraud Score", "Unavailable")
+        st.metric("Estimated Fraud Score", f"{score * 100:.2f}%")
 
     st.caption(
         "This is a machine-learning prediction, not confirmation of fraud. "
-        "The score is the model's estimated probability and has not "
-        "necessarily been calibrated to real-world fraud rates."
+        "The probability score may not be calibrated to real-world fraud rates."
     )
 
 
+def navigate_to(destination):
+    """Set the actual sidebar radio value before rerunning the app."""
+
+    st.session_state["page_navigation"] = destination
+    st.rerun()
+
+
 # ============================================================
-# 5. SIDEBAR NAVIGATION
+# 5. SIDEBAR NAVIGATION — FIXED
 # ============================================================
 
 st.sidebar.markdown(
@@ -688,7 +453,7 @@ st.sidebar.markdown(
         <div style="font-size: 1.55rem; font-weight: 800; color: #54249b;">
             FraudGuard
         </div>
-        <div style="font-size: 0.85rem; color: #776c87;">
+        <div style="font-size: 0.85rem; color: #5f536f;">
             Intelligent Transaction Analysis
         </div>
     </div>
@@ -698,19 +463,18 @@ st.sidebar.markdown(
 
 st.sidebar.divider()
 
+# This key is shared by the sidebar and the Home page navigation buttons.
+# Changing it and rerunning selects the requested page.
+if st.session_state.get("page_navigation") not in PAGES:
+    st.session_state["page_navigation"] = "Home"
+
 page = st.sidebar.radio(
     "NAVIGATION",
-    [
-        "Home",
-        "Analyze Transaction",
-        "Batch Analysis",
-        "Model Performance",
-        "About Project",
-    ],
+    options=PAGES,
+    key="page_navigation",
 )
 
 st.sidebar.divider()
-
 st.sidebar.markdown("**Active Model**")
 st.sidebar.success("Tuned XGBoost")
 
@@ -726,7 +490,7 @@ st.sidebar.markdown(
 
 
 # ============================================================
-# 6. HOME DASHBOARD
+# 6. HOME
 # ============================================================
 
 if page == "Home":
@@ -735,7 +499,7 @@ if page == "Home":
         "MACHINE LEARNING • TRANSACTION SECURITY",
         "Smarter Fraud Detection.",
         "Explore transaction risk using a trained XGBoost classifier. "
-        "Analyze individual transactions or process a CSV file in seconds.",
+        "Analyze a single transaction or process a CSV file.",
     )
 
     st.subheader("Your Fraud Analysis Workspace")
@@ -754,7 +518,7 @@ if page == "Home":
         st.metric("Active Model", "XGBoost")
 
     with c2:
-        st.metric("Model Input Features", "30")
+        st.metric("Input Features", "30")
 
     with c3:
         st.metric("Test Average Precision", "0.8139")
@@ -778,18 +542,18 @@ if page == "Home":
         if st.button(
             "Analyze a Transaction →",
             key="home_single",
+            type="primary",
             use_container_width=True,
         ):
-            st.session_state["navigation_target"] = "Analyze Transaction"
-            st.rerun()
+            navigate_to("Analyze Transaction")
 
     with c2:
         st.markdown(
             """
             <div class="info-card">
                 <h3>📊 Batch CSV Analysis</h3>
-                <p>Upload a CSV of transactions, generate predictions,
-                review the results, and download a report.</p>
+                <p>Upload a CSV, review the predicted classifications,
+                and download a report of the results.</p>
             </div>
             """,
             unsafe_allow_html=True,
@@ -798,10 +562,10 @@ if page == "Home":
         if st.button(
             "Analyze a CSV →",
             key="home_batch",
+            type="primary",
             use_container_width=True,
         ):
-            st.session_state["navigation_target"] = "Batch Analysis"
-            st.rerun()
+            navigate_to("Batch Analysis")
 
     st.markdown("### Model at a glance")
 
@@ -823,9 +587,9 @@ if page == "Home":
         st.markdown(
             """
             <div class="info-card">
-                <h3>⚖️ Imbalanced Data</h3>
+                <h3>⚖️ Imbalanced Dataset</h3>
                 <p>The cleaned dataset contains 473 fraud cases among
-                283,726 transactions, making recall and precision important.</p>
+                283,726 transactions.</p>
             </div>
             """,
             unsafe_allow_html=True,
@@ -835,9 +599,9 @@ if page == "Home":
         st.markdown(
             """
             <div class="info-card">
-                <h3>📈 Evaluation</h3>
-                <p>Recorded results include Average Precision, precision,
-                recall and F1-score rather than accuracy alone.</p>
+                <h3>📈 Model Evaluation</h3>
+                <p>Average Precision, precision, recall and F1-score
+                help evaluate performance beyond accuracy alone.</p>
             </div>
             """,
             unsafe_allow_html=True,
@@ -846,9 +610,9 @@ if page == "Home":
     st.markdown(
         """
         <div class="notice">
-            <strong>Important:</strong> This application is an educational
-            demonstration. It is not connected to a bank and should not be
-            used to make real financial decisions.
+            <strong>Important:</strong> This is an educational demonstration.
+            It is not connected to a bank and should not be used to make
+            real financial decisions.
         </div>
         """,
         unsafe_allow_html=True,
@@ -864,8 +628,8 @@ elif page == "Analyze Transaction":
     show_hero(
         "TRANSACTION ANALYSIS",
         "Analyze a Transaction.",
-        "Provide the transaction's numerical features to see how "
-        "the trained XGBoost model classifies it.",
+        "Enter the numerical features to see how the trained "
+        "XGBoost model classifies a transaction.",
     )
 
     st.markdown(
@@ -873,9 +637,8 @@ elif page == "Analyze Transaction":
         <div class="notice">
             <strong>Before you begin:</strong> V1–V28 are anonymized
             numerical features from the original dataset. They are not
-            card numbers, names, or ordinary customer details.
-            For meaningful predictions, use real feature values from
-            a compatible dataset.
+            ordinary customer details. For meaningful predictions,
+            use actual feature values from a compatible dataset.
         </div>
         """,
         unsafe_allow_html=True,
@@ -905,20 +668,24 @@ elif page == "Analyze Transaction":
                 help="Use the same amount units as the training dataset.",
             )
 
-        st.markdown("#### Anonymized features")
+        st.markdown("#### Anonymized Features")
 
         use_zero_features = st.checkbox(
             "Use zero for all V1–V28 features",
             value=True,
             help=(
-                "This is a demonstration input, not a realistic transaction. "
-                "For useful predictions, enter the actual feature values."
+                "Zero placeholders are for demonstration only. "
+                "They do not represent a realistic transaction."
             ),
         )
 
         feature_values = {}
 
-        if not use_zero_features:
+        if use_zero_features:
+            feature_values = {
+                f"V{i}": 0.0 for i in range(1, 29)
+            }
+        else:
             for start in range(1, 29, 4):
                 cols = st.columns(4)
 
@@ -933,8 +700,6 @@ elif page == "Analyze Transaction":
                                 format="%.6f",
                                 key=f"single_v{index}",
                             )
-        else:
-            feature_values = {f"V{i}": 0.0 for i in range(1, 29)}
 
         submitted = st.form_submit_button(
             "Analyze Transaction",
@@ -954,9 +719,13 @@ elif page == "Analyze Transaction":
             results = analyze_transactions(input_df)
 
             prediction = (
-                1 if results["Prediction"].iloc[0] == "Potential Fraud" else 0
+                1
+                if results["Prediction"].iloc[0] == "Potential Fraud"
+                else 0
             )
-            score = results["Estimated_Fraud_Score (%)"].iloc[0] / 100
+            score = (
+                results["Estimated_Fraud_Score (%)"].iloc[0] / 100
+            )
 
             show_result(prediction, score)
 
@@ -969,8 +738,8 @@ elif page == "Analyze Transaction":
 
             if use_zero_features:
                 st.warning(
-                    "You used zero placeholders for all anonymized features. "
-                    "The prediction is for this artificial input and should "
+                    "All 28 anonymized features were set to zero. "
+                    "This prediction is for artificial input and should "
                     "not be interpreted as a realistic fraud assessment."
                 )
 
@@ -987,16 +756,16 @@ elif page == "Batch Analysis":
     show_hero(
         "BATCH PROCESSING",
         "Analyze Multiple Transactions.",
-        "Upload a compatible CSV, review predicted classifications, "
-        "and export the results for further analysis.",
+        "Upload a compatible CSV, review the predicted classifications, "
+        "and export the results.",
     )
 
     st.markdown(
         """
         <div class="notice">
-            <strong>Required CSV columns:</strong> Time, V1, V2, ...,
-            V28, Amount. Column names must match the original training
-            features. An optional Class column is ignored during prediction.
+            <strong>Required columns:</strong> Time, V1, V2, ...,
+            V28 and Amount. Column names must match the training features.
+            An optional Class column is not used for prediction.
         </div>
         """,
         unsafe_allow_html=True,
@@ -1005,11 +774,10 @@ elif page == "Batch Analysis":
     uploaded_file = st.file_uploader(
         "Upload transaction data",
         type=["csv"],
-        help="Use a CSV with the 30 required numerical feature columns.",
+        help="Upload a CSV with the 30 required numerical feature columns.",
     )
 
     if uploaded_file is not None:
-
         try:
             uploaded_df = pd.read_csv(uploaded_file)
 
@@ -1018,13 +786,13 @@ elif page == "Batch Analysis":
 
             else:
                 missing = [
-                    column for column in FEATURES
-                    if column not in uploaded_df.columns
+                    col for col in FEATURES
+                    if col not in uploaded_df.columns
                 ]
 
                 if missing:
                     st.error(
-                        "The CSV is missing these required columns: "
+                        "The CSV is missing required columns: "
                         + ", ".join(missing)
                     )
 
@@ -1035,7 +803,6 @@ elif page == "Batch Analysis":
                     )
 
                 else:
-                    st.markdown("### Uploaded data preview")
                     st.caption(
                         f"{len(uploaded_df):,} transactions loaded."
                     )
@@ -1050,101 +817,104 @@ elif page == "Batch Analysis":
                         "Run Fraud Analysis",
                         type="primary",
                         use_container_width=True,
+                        key="run_batch_analysis",
                     ):
-
                         try:
-                            # Class, if present, is never passed to the model.
                             model_input = uploaded_df[FEATURES].copy()
-                            results = analyze_transactions(model_input)
-
-                            fraud_count = int(
-                                (results["Prediction"] == "Potential Fraud").sum()
+                            st.session_state["batch_results"] = (
+                                analyze_transactions(model_input)
                             )
-                            normal_count = len(results) - fraud_count
-
-                            st.markdown("### Analysis Summary")
-
-                            c1, c2, c3 = st.columns(3)
-
-                            with c1:
-                                st.metric(
-                                    "Transactions Analyzed",
-                                    f"{len(results):,}",
-                                )
-
-                            with c2:
-                                st.metric(
-                                    "Potential Fraud Flags",
-                                    f"{fraud_count:,}",
-                                )
-
-                            with c3:
-                                st.metric(
-                                    "Classified as Normal",
-                                    f"{normal_count:,}",
-                                )
-
-                            if fraud_count:
-                                st.warning(
-                                    f"The model flagged {fraud_count:,} "
-                                    "transaction(s) for further review."
-                                )
-                            else:
-                                st.success(
-                                    "The model did not flag any transactions "
-                                    "in this batch."
-                                )
-
-                            st.markdown("### Prediction Results")
-
-                            filter_choice = st.selectbox(
-                                "Filter results",
-                                [
-                                    "All Transactions",
-                                    "Potential Fraud Only",
-                                    "Normal Only",
-                                ],
-                            )
-
-                            if filter_choice == "Potential Fraud Only":
-                                display_df = results[
-                                    results["Prediction"] == "Potential Fraud"
-                                ]
-                            elif filter_choice == "Normal Only":
-                                display_df = results[
-                                    results["Prediction"] == "Normal"
-                                ]
-                            else:
-                                display_df = results
-
-                            st.dataframe(
-                                display_df,
-                                use_container_width=True,
-                                hide_index=True,
-                            )
-
-                            csv_bytes = results.to_csv(
-                                index=False
-                            ).encode("utf-8")
-
-                            st.download_button(
-                                "Download Complete Results (CSV)",
-                                data=csv_bytes,
-                                file_name="fraud_detection_results.csv",
-                                mime="text/csv",
-                                use_container_width=True,
-                            )
-
-                            st.caption(
-                                "A predicted fraud flag is not a confirmed "
-                                "fraud case. Review flagged transactions "
-                                "independently."
-                            )
-
                         except Exception as exc:
+                            st.session_state.pop("batch_results", None)
                             st.error(
                                 f"Unable to analyze the uploaded data: {exc}"
                             )
+
+                    # Keep results available when the filter or another
+                    # widget changes and causes Streamlit to rerun.
+                    results = st.session_state.get("batch_results")
+
+                    if results is not None:
+                        fraud_count = int(
+                            (
+                                results["Prediction"] == "Potential Fraud"
+                            ).sum()
+                        )
+                        normal_count = len(results) - fraud_count
+
+                        st.markdown("### Analysis Summary")
+
+                        c1, c2, c3 = st.columns(3)
+
+                        with c1:
+                            st.metric(
+                                "Transactions Analyzed",
+                                f"{len(results):,}",
+                            )
+
+                        with c2:
+                            st.metric(
+                                "Potential Fraud Flags",
+                                f"{fraud_count:,}",
+                            )
+
+                        with c3:
+                            st.metric(
+                                "Classified as Normal",
+                                f"{normal_count:,}",
+                            )
+
+                        if fraud_count:
+                            st.warning(
+                                f"The model flagged {fraud_count:,} "
+                                "transaction(s) for further review."
+                            )
+                        else:
+                            st.success(
+                                "The model did not flag any transactions "
+                                "in this batch."
+                            )
+
+                        st.markdown("### Prediction Results")
+
+                        filter_choice = st.selectbox(
+                            "Filter results",
+                            [
+                                "All Transactions",
+                                "Potential Fraud Only",
+                                "Normal Only",
+                            ],
+                        )
+
+                        if filter_choice == "Potential Fraud Only":
+                            display_df = results[
+                                results["Prediction"] == "Potential Fraud"
+                            ]
+                        elif filter_choice == "Normal Only":
+                            display_df = results[
+                                results["Prediction"] == "Normal"
+                            ]
+                        else:
+                            display_df = results
+
+                        st.dataframe(
+                            display_df,
+                            use_container_width=True,
+                            hide_index=True,
+                        )
+
+                        st.download_button(
+                            "Download Complete Results (CSV)",
+                            data=results.to_csv(index=False).encode("utf-8"),
+                            file_name="fraud_detection_results.csv",
+                            mime="text/csv",
+                            use_container_width=True,
+                        )
+
+                        st.caption(
+                            "A fraud prediction is not confirmation of fraud. "
+                            "Review flagged transactions independently."
+                        )
 
         except Exception as exc:
             st.error(f"Unable to read the CSV file: {exc}")
@@ -1165,8 +935,8 @@ elif page == "Batch Analysis":
         )
 
         st.caption(
-            "The template contains placeholder zeros only. Replace them "
-            "with valid feature values before interpreting predictions."
+            "The template contains placeholder zeros. Replace them with "
+            "valid feature values before interpreting predictions."
         )
 
 
@@ -1186,8 +956,9 @@ elif page == "Model Performance":
     st.markdown(
         """
         <div class="notice">
-            These metrics were recorded during your earlier notebook
-            evaluation. They are not recalculated by this web application.
+            These results come from your earlier notebook evaluation.
+            The app displays the recorded metrics; it does not retrain
+            or reevaluate the model on this page.
         </div>
         """,
         unsafe_allow_html=True,
@@ -1196,28 +967,35 @@ elif page == "Model Performance":
     c1, c2, c3, c4 = st.columns(4)
 
     with c1:
-        st.metric("Test Average Precision", "0.8139")
+        st.metric(
+            "Test Average Precision",
+            f"{MODEL_METRICS['Test Average Precision']:.4f}",
+        )
 
     with c2:
-        st.metric("Precision", "0.8621")
+        st.metric(
+            "Precision",
+            f"{MODEL_METRICS['Precision']:.4f}",
+        )
 
     with c3:
-        st.metric("Recall", "0.7895")
+        st.metric(
+            "Recall",
+            f"{MODEL_METRICS['Recall']:.4f}",
+        )
 
     with c4:
-        st.metric("F1-score", "0.8242")
+        st.metric(
+            "F1-score",
+            f"{MODEL_METRICS['F1-score']:.4f}",
+        )
 
     st.markdown("### Evaluation Metrics")
 
     metric_data = pd.DataFrame(
         {
-            "Metric": [
-                "Test Average Precision",
-                "Precision",
-                "Recall",
-                "F1-score",
-            ],
-            "Score": [0.8139, 0.8621, 0.7895, 0.8242],
+            "Metric": list(MODEL_METRICS.keys()),
+            "Score": list(MODEL_METRICS.values()),
         }
     )
 
@@ -1233,46 +1011,44 @@ elif page == "Model Performance":
         """
         - **Average Precision (0.8139):** Summarizes precision-recall
           performance across different score thresholds.
-        - **Precision (0.8621):** Among transactions flagged by the model
-          in the recorded test evaluation, approximately 86.21% were fraud.
+        - **Precision (0.8621):** Approximately 86.21% of the transactions
+          flagged as fraud in the recorded evaluation were fraud cases.
         - **Recall (0.7895):** The model detected approximately 78.95% of
-          the actual fraud cases in that evaluation.
-        - **F1-score (0.8242):** Combines precision and recall into a
-          single measure.
+          actual fraud cases in the recorded evaluation.
+        - **F1-score (0.8242):** Combines precision and recall into one score.
         """
     )
 
-    st.markdown("### Training configuration")
-
-    params = {
-        "Parameter": [
-            "Model",
-            "Number of estimators",
-            "Maximum tree depth",
-            "Learning rate",
-            "Subsample",
-            "Column sample by tree",
-        ],
-        "Value": [
-            "Tuned XGBoost",
-            "150",
-            "5",
-            "0.1",
-            "1.0",
-            "1.0",
-        ],
-    }
+    st.markdown("### Training Configuration")
 
     st.dataframe(
-        pd.DataFrame(params),
+        pd.DataFrame(
+            {
+                "Parameter": [
+                    "Model",
+                    "Number of estimators",
+                    "Maximum tree depth",
+                    "Learning rate",
+                    "Subsample",
+                    "Column sample by tree",
+                ],
+                "Value": [
+                    "Tuned XGBoost",
+                    "150",
+                    "5",
+                    "0.1",
+                    "1.0",
+                    "1.0",
+                ],
+            }
+        ),
         use_container_width=True,
         hide_index=True,
     )
 
     st.caption(
-        "Results depend on the dataset and evaluation split. Repeated "
-        "experimentation on the same test set can make reported performance "
-        "optimistic. Independent validation is recommended."
+        "Repeated experimentation on the same test set can make reported "
+        "performance optimistic. Independent validation is recommended."
     )
 
 
@@ -1312,15 +1088,15 @@ elif page == "About Project":
     with c3:
         st.metric("Fraud Transactions", "473")
 
-    st.markdown("### Features used")
+    st.markdown("### Features Used")
 
     st.markdown(
         """
-        - **Time:** Seconds elapsed since the first transaction in the dataset.
+        - **Time:** Seconds elapsed since the first transaction.
         - **V1–V28:** Anonymized numerical features derived using PCA.
         - **Amount:** The transaction amount.
         - **Class:** The original target label (0 = normal, 1 = fraud).
-          It is not an input to the deployed prediction model.
+          Class is not an input to the deployed model.
         """
     )
 
@@ -1332,7 +1108,7 @@ elif page == "About Project":
         2. Split data into stratified training and testing sets.
         3. Cap Amount outliers using limits computed on training data.
         4. Train and compare Logistic Regression, Random Forest and XGBoost.
-        5. Select tuned XGBoost for this deployment based on its recorded
+        5. Select tuned XGBoost for deployment based on its recorded
            test Average Precision.
         """
     )
@@ -1340,11 +1116,11 @@ elif page == "About Project":
     st.markdown("### Limitations")
 
     st.warning(
-        "This is a student project and not a production fraud prevention "
-        "system. The input features are anonymized, the model was trained "
-        "on historical data, and probability scores may not be calibrated. "
-        "Real-world deployment would require reliable feature generation, "
-        "monitoring, independent validation, security and privacy controls."
+        "This is a student project, not a production fraud prevention system. "
+        "The features are anonymized, the model uses historical data, and "
+        "its probability scores may not be calibrated. Real-world deployment "
+        "requires independent validation, reliable feature generation, "
+        "monitoring, security and privacy controls."
     )
 
 
