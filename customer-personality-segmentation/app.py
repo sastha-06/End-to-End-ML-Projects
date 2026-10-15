@@ -4,68 +4,133 @@ import pandas as pd
 import streamlit as st
 from pathlib import Path
 
-# --------------------------------------------------
-# 1. Load saved model files
-# --------------------------------------------------
+# ==================================================
+# 1. PAGE CONFIGURATION
+# ==================================================
+
+st.set_page_config(
+    page_title="SegmentIQ | Customer Segmentation",
+    page_icon="👥",
+    layout="wide"
+)
+
+# ==================================================
+# 2. LOAD SAVED MODEL FILES
+# ==================================================
 
 MODEL_DIR = Path(__file__).parent / "savedmodel"
 
 try:
-    kmeans = joblib.load(MODEL_DIR / "kmeans_customer_model.pkl")
-    scaler = joblib.load(MODEL_DIR / "customer_scaler.pkl")
-    config = joblib.load(MODEL_DIR / "preprocessing_config.pkl")
-except FileNotFoundError as e:
-    st.error(f"Required model file not found: {e.filename}")
+    kmeans = joblib.load(
+        MODEL_DIR / "kmeans_customer_model.pkl"
+    )
+
+    scaler = joblib.load(
+        MODEL_DIR / "customer_scaler.pkl"
+    )
+
+    config = joblib.load(
+        MODEL_DIR / "preprocessing_config.pkl"
+    )
+
+except FileNotFoundError as error:
+    st.error(
+        f"Required model file not found: {error.filename}. "
+        "Check the savedmodel folder and file names."
+    )
     st.stop()
 
 FEATURE_NAMES = config["feature_names"]
 
-if len(FEATURE_NAMES) != 28 or scaler.n_features_in_ != 28:
+if (
+    len(FEATURE_NAMES) != 28
+    or scaler.n_features_in_ != 28
+    or kmeans.n_features_in_ != 28
+):
     st.error(
-        "Feature mismatch: this app expects 28 features. "
-        "Check your saved model and preprocessing configuration."
+        "Feature mismatch. The model, scaler, and configuration "
+        "must all use the same 28 features."
     )
     st.stop()
 
-# --------------------------------------------------
-# 2. Preprocess a customer's details
-# --------------------------------------------------
+
+# ==================================================
+# 3. CLUSTER PROFILES FROM TRAINING DATA
+# ==================================================
+
+# These are the previously calculated training-cluster
+# averages. Update them if you retrain your model.
+
+CLUSTER_PROFILES = {
+    0: {
+        "Income": 39327.55,
+        "Age": 44.09,
+        "Children": 1.25,
+        "MntWines": 114.20,
+        "MntMeatProducts": 38.40,
+        "NumWebPurchases": 3.01,
+        "NumStorePurchases": 4.01,
+        "NumWebVisitsMonth": 6.42,
+    },
+    1: {
+        "Income": 71501.48,
+        "Age": 46.68,
+        "Children": 0.48,
+        "MntWines": 601.66,
+        "MntMeatProducts": 368.47,
+        "NumWebPurchases": 5.77,
+        "NumStorePurchases": 8.60,
+        "NumWebVisitsMonth": 3.60,
+    },
+}
+
+
+# ==================================================
+# 4. PREPROCESS CUSTOMER INPUT
+# ==================================================
 
 def preprocess_customer(data):
-    customer = pd.DataFrame([data])
+    customer = pd.DataFrame([data]).copy()
 
-    # Fill missing income and apply training-time limits
+    # Fill missing income using the training median
     customer["Income"] = pd.to_numeric(
-        customer["Income"], errors="coerce"
+        customer["Income"],
+        errors="coerce"
     ).fillna(config["income_median"])
 
+    # Apply the training-time income limits
     customer["Income"] = customer["Income"].clip(
         lower=config["income_lower"],
         upper=config["income_upper"]
     )
 
-    # Use the same feature engineering as training
+    # Create age using the same reference year
     customer["Age"] = (
         config["reference_year"] - customer["Year_Birth"]
     )
 
+    # Combine children and teenagers
     customer["Children"] = (
         customer["Kidhome"] + customer["Teenhome"]
     )
 
     customer.drop(
-        columns=["Year_Birth", "Kidhome", "Teenhome"],
+        columns=[
+            "Year_Birth",
+            "Kidhome",
+            "Teenhome"
+        ],
         inplace=True
     )
 
-    # Apply one-hot encoding
+    # One-hot encode categorical variables
     customer = pd.get_dummies(
         customer,
         columns=["Education", "Marital_Status"],
         dtype=int
     )
 
-    # Restore the exact training feature order
+    # Ensure exact training columns and their order
     customer = customer.reindex(
         columns=FEATURE_NAMES,
         fill_value=0
@@ -74,32 +139,135 @@ def preprocess_customer(data):
     return customer
 
 
-# --------------------------------------------------
-# 3. Streamlit page
-# --------------------------------------------------
+# ==================================================
+# 5. EXPLAIN THE PREDICTION
+# ==================================================
 
-st.set_page_config(
-    page_title="Customer Personality Segmentation",
-    page_icon="👥",
-    layout="wide"
-)
+def explain_prediction(data, cluster):
+    profile = CLUSTER_PROFILES[cluster]
 
-st.title("Customer Personality Segmentation")
+    comparisons = [
+        (
+            "Annual income",
+            data["Income"],
+            profile["Income"],
+            "₹{:,.0f}"
+        ),
+        (
+            "Age",
+            config["reference_year"] - data["Year_Birth"],
+            profile["Age"],
+            "{:.1f} years"
+        ),
+        (
+            "Children at home",
+            data["Kidhome"] + data["Teenhome"],
+            profile["Children"],
+            "{:.2f}"
+        ),
+        (
+            "Wine spending",
+            data["MntWines"],
+            profile["MntWines"],
+            "{:.2f}"
+        ),
+        (
+            "Meat spending",
+            data["MntMeatProducts"],
+            profile["MntMeatProducts"],
+            "{:.2f}"
+        ),
+        (
+            "Web purchases",
+            data["NumWebPurchases"],
+            profile["NumWebPurchases"],
+            "{:.2f}"
+        ),
+        (
+            "Store purchases",
+            data["NumStorePurchases"],
+            profile["NumStorePurchases"],
+            "{:.2f}"
+        ),
+        (
+            "Website visits per month",
+            data["NumWebVisitsMonth"],
+            profile["NumWebVisitsMonth"],
+            "{:.2f}"
+        ),
+    ]
+
+    rows = []
+    explanations = []
+
+    for feature, entered, average, fmt in comparisons:
+        difference = entered - average
+
+        if difference > 0:
+            direction = "Above cluster average"
+        elif difference < 0:
+            direction = "Below cluster average"
+        else:
+            direction = "Equal to cluster average"
+
+        rows.append({
+            "Feature": feature,
+            "Your input": fmt.format(entered),
+            "Cluster average": fmt.format(average),
+            "Comparison": direction
+        })
+
+        # Explain the largest meaningful differences.
+        # This is descriptive, not a causal explanation.
+        if average != 0:
+            relative_difference = abs(difference) / abs(average)
+        else:
+            relative_difference = 0
+
+        if relative_difference >= 0.20:
+            if difference > 0:
+                explanations.append(
+                    f"**{feature}:** your value is above "
+                    f"this cluster's average "
+                    f"({fmt.format(entered)} versus "
+                    f"{fmt.format(average)})."
+                )
+            elif difference < 0:
+                explanations.append(
+                    f"**{feature}:** your value is below "
+                    f"this cluster's average "
+                    f"({fmt.format(entered)} versus "
+                    f"{fmt.format(average)})."
+                )
+
+    return pd.DataFrame(rows), explanations
+
+
+# ==================================================
+# 6. APP HEADER
+# ==================================================
+
+st.title("👥 SegmentIQ")
+st.subheader("Customer Personality Segmentation")
 st.write(
     "Discover customer segments using your trained "
     "K-Means clustering model."
 )
 
 st.info(
-    "Enter a customer's personal details, spending, "
-    "and purchase activity to predict their segment."
+    "Enter customer details to predict a segment. "
+    "The explanation compares selected customer values "
+    "with the corresponding training-cluster averages."
 )
 
-# --------------------------------------------------
-# 4. Customer input form
-# --------------------------------------------------
+
+# ==================================================
+# 7. CUSTOMER INPUT FORM
+# ==================================================
 
 with st.form("customer_form"):
+
+    st.header("Customer Details")
 
     st.subheader("Personal Information")
 
@@ -116,15 +284,27 @@ with st.form("customer_form"):
 
         education = st.selectbox(
             "Education",
-            ["Graduation", "PhD", "Master", "Basic", "2n Cycle"]
+            [
+                "Graduation",
+                "PhD",
+                "Master",
+                "Basic",
+                "2n Cycle"
+            ]
         )
 
     with col2:
         marital_status = st.selectbox(
             "Marital Status",
             [
-                "Married", "Together", "Single", "Divorced",
-                "Widow", "Alone", "Absurd", "YOLO"
+                "Married",
+                "Together",
+                "Single",
+                "Divorced",
+                "Widow",
+                "Alone",
+                "Absurd",
+                "YOLO"
             ]
         )
 
@@ -155,16 +335,40 @@ with st.form("customer_form"):
     col1, col2, col3 = st.columns(3)
 
     with col1:
-        wines = st.number_input("Wine Spending", min_value=0, value=300)
-        fruits = st.number_input("Fruit Spending", min_value=0, value=20)
+        wines = st.number_input(
+            "Wine Spending",
+            min_value=0,
+            value=300
+        )
+        fruits = st.number_input(
+            "Fruit Spending",
+            min_value=0,
+            value=20
+        )
 
     with col2:
-        meat = st.number_input("Meat Spending", min_value=0, value=100)
-        fish = st.number_input("Fish Spending", min_value=0, value=30)
+        meat = st.number_input(
+            "Meat Spending",
+            min_value=0,
+            value=100
+        )
+        fish = st.number_input(
+            "Fish Spending",
+            min_value=0,
+            value=30
+        )
 
     with col3:
-        sweets = st.number_input("Sweet Spending", min_value=0, value=20)
-        gold = st.number_input("Gold Spending", min_value=0, value=50)
+        sweets = st.number_input(
+            "Sweet Spending",
+            min_value=0,
+            value=20
+        )
+        gold = st.number_input(
+            "Gold Spending",
+            min_value=0,
+            value=50
+        )
 
     st.subheader("Purchase Behaviour")
 
@@ -172,26 +376,38 @@ with st.form("customer_form"):
 
     with col1:
         recency = st.number_input(
-            "Days Since Last Purchase", min_value=0, value=30
+            "Days Since Last Purchase",
+            min_value=0,
+            value=30
         )
         deals = st.number_input(
-            "Deals Purchases", min_value=0, value=2
+            "Deals Purchases",
+            min_value=0,
+            value=2
         )
 
     with col2:
         web_purchases = st.number_input(
-            "Web Purchases", min_value=0, value=4
+            "Web Purchases",
+            min_value=0,
+            value=4
         )
         catalog_purchases = st.number_input(
-            "Catalog Purchases", min_value=0, value=2
+            "Catalog Purchases",
+            min_value=0,
+            value=2
         )
 
     with col3:
         store_purchases = st.number_input(
-            "Store Purchases", min_value=0, value=5
+            "Store Purchases",
+            min_value=0,
+            value=5
         )
         web_visits = st.number_input(
-            "Website Visits per Month", min_value=0, value=5
+            "Website Visits per Month",
+            min_value=0,
+            value=5
         )
 
     submitted = st.form_submit_button(
@@ -200,9 +416,10 @@ with st.form("customer_form"):
         use_container_width=True
     )
 
-# --------------------------------------------------
-# 5. Predict the segment
-# --------------------------------------------------
+
+# ==================================================
+# 8. PREDICTION AND INPUT-BASED EXPLANATION
+# ==================================================
 
 if submitted:
 
@@ -230,44 +447,105 @@ if submitted:
     age = config["reference_year"] - year_birth
 
     if not 18 <= age <= 100:
-        st.error("Please enter a birth year that gives an age from 18 to 100.")
+        st.error(
+            "Please enter a birth year that gives an age "
+            "between 18 and 100."
+        )
+
     else:
         try:
-            customer_features = preprocess_customer(customer_data)
+            # Prepare the 28 input features
+            customer_features = preprocess_customer(
+                customer_data
+            )
 
-            if customer_features.shape[1] != scaler.n_features_in_:
-                st.error("The prepared customer features do not match the scaler.")
+            if customer_features.shape[1] != 28:
+                st.error(
+                    "The prepared input does not contain "
+                    "exactly 28 features."
+                )
                 st.stop()
 
-            scaled_features = scaler.transform(customer_features)
-            cluster = int(kmeans.predict(scaled_features)[0])
+            # Apply the already-fitted training scaler
+            scaled_features = scaler.transform(
+                customer_features
+            )
+
+            # Predict using the saved K-Means model
+            cluster = int(
+                kmeans.predict(scaled_features)[0]
+            )
 
             st.divider()
-            st.subheader("Prediction Result")
+            st.header("Prediction Result")
 
-            st.success(f"Predicted Customer Cluster: {cluster}")
+            st.success(
+                f"Predicted Customer Cluster: {cluster}"
+            )
 
             if cluster == 0:
-                st.write(
-                    "**Cluster 0 — Lower-spending segment (in your training data).**"
+                st.markdown(
+                    "### Cluster 0 — Lower-spending profile"
                 )
                 st.write(
-                    "Your training profile showed lower average income and "
-                    "spending, more children at home, and more monthly website visits."
+                    "In your training data, this cluster had "
+                    "lower average income and product spending, "
+                    "more children at home, fewer purchases, "
+                    "and more monthly website visits."
                 )
             else:
-                st.write(
-                    "**Cluster 1 — Higher-spending segment (in your training data).**"
+                st.markdown(
+                    "### Cluster 1 — Higher-spending profile"
                 )
                 st.write(
-                    "Your training profile showed higher average income and "
-                    "spending, more purchases, and fewer monthly website visits."
+                    "In your training data, this cluster had "
+                    "higher average income and product spending, "
+                    "more purchases, fewer children at home, "
+                    "and fewer monthly website visits."
+                )
+
+            # Compare the actual inputs against cluster averages
+            st.subheader(
+                "Why was this customer assigned to this cluster?"
+            )
+
+            st.write(
+                "The table compares your entered values with "
+                "the average profile of the predicted cluster."
+            )
+
+            comparison_df, explanations = explain_prediction(
+                customer_data,
+                cluster
+            )
+
+            st.dataframe(
+                comparison_df,
+                hide_index=True,
+                use_container_width=True
+            )
+
+            st.subheader("Input-based explanation")
+
+            if explanations:
+                for explanation in explanations:
+                    st.markdown(f"- {explanation}")
+            else:
+                st.write(
+                    "The selected values are relatively close "
+                    "to this cluster's averages. The assignment "
+                    "may reflect the combined pattern across "
+                    "all 28 features."
                 )
 
             st.caption(
-                "This prediction uses your saved K-Means model. "
-                "Cluster labels are model-specific, not rankings."
+                "K-Means uses all 28 scaled features to assign "
+                "the cluster. These comparisons describe selected "
+                "differences from cluster averages; they do not "
+                "prove that any single input caused the assignment."
             )
 
-        except Exception as e:
-            st.error(f"Prediction failed: {e}")
+        except Exception as error:
+            st.error(
+                f"Prediction failed: {error}"
+            )
