@@ -150,22 +150,64 @@ st.markdown(
         font-weight: 750;
     }
 
+    /* All buttons: readable text and consistent styling */
     .stButton > button,
-    .stDownloadButton > button {
+    .stDownloadButton > button,
+    [data-testid="stFormSubmitButton"] button {
+        background-color: #eee8f7 !important;
+        color: #38205e !important;
+        border: 1px solid #d8c9ed !important;
         border-radius: 10px;
         font-weight: 600;
         min-height: 44px;
     }
 
-    .stButton > button[kind="primary"] {
-        background: #6031a7;
-        border: 1px solid #6031a7;
-        color: #ffffff;
+    /* Ensure nested button text and icons inherit the visible color */
+    .stButton > button *,
+    .stDownloadButton > button *,
+    [data-testid="stFormSubmitButton"] button * {
+        color: inherit !important;
     }
 
-    .stButton > button[kind="primary"]:hover {
-        background: #48217f;
-        border-color: #48217f;
+    .stButton > button:hover,
+    .stDownloadButton > button:hover,
+    [data-testid="stFormSubmitButton"] button:hover {
+        background-color: #dfd1f2 !important;
+        color: #281044 !important;
+        border-color: #7040bd !important;
+    }
+
+    /* Primary action buttons use purple with white text */
+    .stButton > button[kind="primary"],
+    .stDownloadButton > button[kind="primary"],
+    [data-testid="stFormSubmitButton"] button[kind="primary"] {
+        background-color: #6031a7 !important;
+        color: #ffffff !important;
+        border: 1px solid #6031a7 !important;
+    }
+
+    .stButton > button[kind="primary"] *,
+    .stDownloadButton > button[kind="primary"] *,
+    [data-testid="stFormSubmitButton"] button[kind="primary"] * {
+        color: #ffffff !important;
+    }
+
+    .stButton > button[kind="primary"]:hover,
+    .stDownloadButton > button[kind="primary"]:hover,
+    [data-testid="stFormSubmitButton"] button[kind="primary"]:hover {
+        background-color: #48217f !important;
+        color: #ffffff !important;
+        border-color: #48217f !important;
+    }
+
+    /* Disabled buttons remain readable */
+    .stButton > button:disabled,
+    .stDownloadButton > button:disabled,
+    [data-testid="stFormSubmitButton"] button:disabled {
+        background-color: #e8e5ed !important;
+        color: #655b72 !important;
+        border-color: #d7d1df !important;
+        opacity: 1 !important;
     }
 
     div[data-testid="stForm"] {
